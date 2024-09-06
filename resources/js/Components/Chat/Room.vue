@@ -1,8 +1,40 @@
 <script setup>
 import ChatBubble from '@/Components/Chat/Icons/ChatBubble.vue'
+import { onMounted, onUnmounted } from 'vue';
 
 const props = defineProps(['room'])
 
+onMounted(() => {
+    Echo.private(`room.${props.room.id}`)
+        .listen('MessageSent', (e) => {
+            if(!props.room.messages){
+                props.room.messages = []
+            }
+            props.room.messages.push(e.message)
+        })
+        .listen('RoomUserAttached', (e) => {
+            if(!props.room.users){
+                props.room.users = []
+            }
+            props.room.users.push(e.user)
+        })
+        .listen('RoomUserDetached', (e) => {
+            if(!props.room.users) return
+            const userIndex = props.room.users
+                .findIndex(roomUser => roomUser.id == e.user.id)
+            if(userIndex == -1) return
+            props.room.users.splice(userIndex, 1)
+        })
+        .listen('RoomUserRoleChanged', (e) => {
+            const roomUser = props.room.users
+                .find(roomUser => roomUser.id == e.userId)
+            if(!roomUser) return
+            roomUser.pivot.type = e.type
+        })
+})
+onUnmounted(() => {
+    Echo.leave(`room.${props.room.id}`)
+})
 </script>
 <template>
     <div class="bg-white px-3 flex items-center bg-grey-light hover:bg-grey-lighter cursor-pointer">

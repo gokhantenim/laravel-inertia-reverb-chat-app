@@ -21,7 +21,44 @@ const selectedRoom = ref(null)
 onMounted(() => {
     loadRooms()
     loadUsers()
+
+    Echo.private(`chat.${props.user.id}`)
+        .listen('RoomUserAttached', (e) => {
+            addRoom(e.room)
+        })
+        .listen('RoomUserDetached', (e) => {
+            removeRoom(e.room.id)
+        })
+    if(props.user.type == 'admin'){
+        Echo.private('chat.admin')
+            .listen('RoomCreated', (e) => {
+                addRoom(e.room)
+            })
+            .listen('RoomDeleted', (e) => {
+                removeRoom(e.roomId)
+            })
+    }
 })
+
+function isIn(roomId){
+    return rooms.value.findIndex( room => room.id == roomId) > -1
+}
+
+function addRoom(room){
+    if(isIn(room.id)) return
+
+    rooms.value.push(room)
+}
+
+function removeRoom(roomId){
+    if(selectedRoom.value && selectedRoom.value.id == roomId){
+        selectedRoom.value = null
+    }
+
+    const roomIndex = rooms.value.findIndex(room => room.id == roomId)
+    if(roomIndex == -1) return
+    rooms.value.splice(roomIndex, 1)
+}
 
 function selectRoom(room){
     selectedRoom.value = room

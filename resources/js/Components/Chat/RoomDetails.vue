@@ -44,12 +44,50 @@ const isAdmin = computed(() => {
     return me.pivot.type == 'admin'
 })
 
+const userNames = computed(() => {
+    if(!props.room || !props.room.users || !props.room.onlineUsers) return ''
+    const onlineUserNames =  Object.values(props.room.onlineUsers)
+        .map((onlineUser) => {
+            return '🟢 ' + onlineUser.name
+        })
+    const offlineUserNames = props.room.users
+        .filter(roomUser => !props.room.onlineUsers[roomUser.id])
+        .map((roomUser) => {
+            return '🔴 ' + roomUser.name
+        })
+    return [...onlineUserNames, ...offlineUserNames].join(', ')
+})
+
 function left(room){
-    
+    Echo.leave(`roomonline.${room.id}`)
 }
 
 function entered(){
+    Echo.join(`roomonline.${props.room.id}`)
+        .here((onlineUsers) => {
+            onlineUsers.forEach((onlineUser) => {
+                setUserOnline(onlineUser, true)
+            })
+        })
+        .joining((onlineUser)=> {
+            setUserOnline(onlineUser, true)
+        })
+        .leaving((onlineUser)=> {
+            setUserOnline(onlineUser, false)
+        })
+
     loadDetails()
+}
+
+function setUserOnline(user, inRoom){
+    if(!props.room.onlineUsers){
+        props.room.onlineUsers = {}
+    }
+    if(inRoom){
+        props.room.onlineUsers[user.id] = user
+    } else {
+        delete props.room.onlineUsers[user.id]
+    }
 }
 
 function loadDetails(){
@@ -109,6 +147,7 @@ function removeRoom(){
                         <tbody>
                             <tr v-for="roomUser in room.users" :class="{'bg-slate-300': roomUser.pivot.type == 'admin'}">
                                 <td class="border border-slate-300">
+                                    {{ room.onlineUsers[roomUser.id] ? '🟢' : '🔴' }} 
                                     {{ roomUser.name }}
                                 </td>
                                 <td class="border border-slate-300">{{ roomUser.pivot.type }}</td>
@@ -155,7 +194,7 @@ function removeRoom(){
                         {{ room.name }}
                     </p>
                     <p class="text-grey-darker text-xs mt-1">
-                        User 1, User 2
+                        {{ userNames }}
                     </p>
                 </div>
             </div>
