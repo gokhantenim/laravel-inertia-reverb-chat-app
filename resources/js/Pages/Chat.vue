@@ -6,5 +6,5 @@ import ChatApp from '@/Components/Chat/ChatApp.vue';
 <template>
     <Head title="Chat" />
 
-    <ChatApp />
+    <ChatApp :user="$page.props.auth.user" />
 </template>

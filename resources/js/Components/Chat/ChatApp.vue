@@ -8,15 +8,43 @@ import ChatBubbleIcon from '@/Components/Chat/Icons/ChatBubble.vue'
 
 import CreateRoom from '@/Components/Chat/CreateRoom.vue';
 import AddUserToRoom from '@/Components/Chat/AddUserToRoom.vue';
-import { ref } from 'vue';
+import { onMounted, ref } from 'vue';
+
+const props = defineProps(['user'])
 
 const openCreateRoom = ref(false)
 const openAddUser = ref(false)
+const rooms = ref([])
+const users = ref([])
+const selectedRoom = ref(null)
+
+onMounted(() => {
+    loadRooms()
+    loadUsers()
+})
+
+function selectRoom(room){
+    selectedRoom.value = room
+}
+
+function loadRooms(){
+    axios.get('/user-rooms')
+        .then((result) => {
+            rooms.value = result.data
+        })
+}
+
+function loadUsers(){
+    axios.get('/users')
+        .then((result) => {
+            users.value = result.data
+        })
+}
 </script>
 <template>
     <div>
         <CreateRoom :show="openCreateRoom" @close="openCreateRoom = false" />
-        <AddUserToRoom :show="openAddUser" @close="openAddUser = false" /> 
+        <AddUserToRoom :users="users" :room="selectedRoom"  :show="openAddUser" @close="openAddUser = false" /> 
         
         <div class="w-full h-32" style="background-color: #449388"></div>
 
@@ -34,8 +62,8 @@ const openAddUser = ref(false)
                                     <UserCircleIcon class="stroke-cyan-500" />
                                 </div>
                                 <div>
-                                    <p>Test User</p>
-                                    <p>Role: normal</p>
+                                    <p>{{ user.name }}</p>
+                                    <p>Role: {{ user.type }}</p>
                                 </div>
                             </div>
 
@@ -59,14 +87,19 @@ const openAddUser = ref(false)
 
                         <!-- Contacts -->
                         <div class="bg-grey-lighter flex-1 overflow-auto">
-                            <Room v-for="i in 3" :room="{name: 'test'}" />
+                            <Room v-for="room in rooms" :room="room" @click="selectRoom(room)"/>
                         </div>
 
                     </div>
 
 
                     <!-- Right -->
-                    <RoomDetails />
+                    <RoomDetails v-if="selectedRoom" :room="selectedRoom" :user="user" @addUser="openAddUser = true" />
+                    <div v-else class="w-2/3 border flex flex-col">
+                        <div class="flex-1 overflow-auto" style="background-color: #DAD3CC">
+                            Select a room
+                        </div>
+                    </div>
 
                 </div>
             </div>

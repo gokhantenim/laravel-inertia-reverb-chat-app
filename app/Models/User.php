@@ -6,6 +6,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use App\Models\Room;
 
 class User extends Authenticatable
 {
@@ -43,5 +45,26 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    public function rooms(): BelongsToMany
+    {
+        return $this->belongsToMany(Room::class);
+    }
+
+    public function canAccessRoom($roomId){
+        return $this->type == 'admin' || $this->isInRoom($roomId);
+    }
+
+    public function canManageRoom($roomId){
+        return $this->type == 'admin' || $this->isAdminInRoom($roomId);
+    }
+
+    public function isInRoom($roomId){
+        return $this->rooms()->where('room_id', $roomId)->exists();
+    }
+
+    public function isAdminInRoom($roomId){
+        return $this->rooms()->where('room_id', $roomId)->where('type', 'admin')->exists();
     }
 }

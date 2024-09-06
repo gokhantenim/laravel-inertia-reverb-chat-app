@@ -12,6 +12,16 @@ const form = useForm({
     name: '',
 });
 const emit = defineEmits(['close'])
+
+function submit(){
+    form.post('/rooms/create', {
+        onFinish: () => {
+            form.name = ''
+            emit('created')
+            emit('close')
+        },
+    })
+}
 </script>
 <template>
     <Modal :show="show" @close="$emit('close')">

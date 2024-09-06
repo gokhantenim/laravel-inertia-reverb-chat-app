@@ -8,9 +8,85 @@ import XCircleIcon from '@/Components/Chat/Icons/XCircle.vue'
 import Modal from '@/Components/Modal.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
-import { ref } from 'vue'
+import { computed, onUnmounted, onMounted, ref, watch } from 'vue'
+import { useForm } from '@inertiajs/vue3';
+
+const props = defineProps(['room', 'user'])
 
 const showUsersDialog = ref(false)
+
+const form = useForm({
+    message: '',
+});
+
+onMounted(() => {
+    entered()
+})
+
+onUnmounted(() => {
+    left(props.room)
+})
+
+watch(() => {
+    if(!props.room) return
+    return props.room
+}, (newRoom, oldRoom) => {
+    left(oldRoom)
+    entered()
+})
+
+const isAdmin = computed(() => {
+    if(props.user.type == 'admin') return true
+    if(!props.room || !props.room.users) return false
+    const me = props.room.users
+        .find( roomUser => roomUser.id == props.user.id)
+    if(!me) return false
+    return me.pivot.type == 'admin'
+})
+
+function left(room){
+    
+}
+
+function entered(){
+    loadDetails()
+}
+
+function loadDetails(){
+    if(props.room.loaded){
+        return
+    }
+
+    axios.get(`/rooms/${props.room.id}/details`)
+        .then((result) => {
+            props.room.messages = result.data.messages
+            props.room.users = result.data.users
+            props.room.loaded = true
+        })
+}
+
+function submitMessage(){
+    form.post(`/rooms/${props.room.id}/send-message`, {
+        onFinish: () => {
+            form.message = ''
+        },
+    })
+}
+
+function removeUser(user){
+    axios.post(`/rooms/${props.room.id}/remove-user`, user)
+}
+
+function toggleRole(user){
+    axios.post(`/rooms/${props.room.id}/set-role`, {
+        id: user.id,
+        type: user.pivot.type == 'admin' ? 'normal' : 'admin'
+    })
+}
+
+function removeRoom(){
+    axios.delete(`/rooms/${props.room.id}/remove`)
+}
 </script>
 <template>
     <div class="w-2/3 border flex flex-col">
@@ -31,21 +107,31 @@ const showUsersDialog = ref(false)
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="i in 3">
+                            <tr v-for="roomUser in room.users" :class="{'bg-slate-300': roomUser.pivot.type == 'admin'}">
                                 <td class="border border-slate-300">
-                                    🟢 Test User
+                                    {{ roomUser.name }}
                                 </td>
-                                <td class="border border-slate-300">admin</td>
+                                <td class="border border-slate-300">{{ roomUser.pivot.type }}</td>
                                 <td class="border border-slate-300">
-                                    <PrimaryButton>Kick</PrimaryButton>
-                                    <PrimaryButton>Set Admin</PrimaryButton>
+                                    <PrimaryButton
+                                        v-if="isAdmin && roomUser.id != user.id"
+                                        @click="removeUser(roomUser)"
+                                    >
+                                        Kick
+                                    </PrimaryButton>
+                                    <PrimaryButton
+                                        v-if="isAdmin"
+                                        @click="toggleRole(roomUser)"
+                                    >
+                                        Set {{ roomUser.pivot.type == 'admin' ? 'Normal' : 'Admin' }}
+                                    </PrimaryButton>
                                 </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
                 <div class="flex items-center justify-end mt-4">
-                    <PrimaryButton class="ms-4" @click="showUsersDialog = false">
+                    <PrimaryButton class="ms-4" @click="$emit('addUser'); showUsersDialog = false">
                         Add User
                     </PrimaryButton>
 
@@ -66,7 +152,7 @@ const showUsersDialog = ref(false)
                 </div>
                 <div class="ml-4">
                     <p class="text-grey-darkest">
-                        Test room
+                        {{ room.name }}
                     </p>
                     <p class="text-grey-darker text-xs mt-1">
                         User 1, User 2
@@ -76,7 +162,7 @@ const showUsersDialog = ref(false)
 
             <div class="flex">
                 <div class="ml-6">
-                    <button class="mr-4">
+                    <button class="mr-4" v-if="isAdmin" @click="removeRoom()">
                         <XCircleIcon class="size-6" />
                     </button>
                     <button @click="showUsersDialog = true">
@@ -90,8 +176,10 @@ const showUsersDialog = ref(false)
         <div class="flex-1 overflow-auto" style="background-color: #DAD3CC">
             <div class="py-2 px-3">
 
-                <MyMessage :message="{message: 'test message', created_at: '2024-09-06 15:56:11'}" />
-                <OtherMessage :message="{message: 'test message', user: {name: 'Test User'}, created_at: '2024-09-06 15:56:11'}" />
+                <template v-for="message in room.messages">
+                    <MyMessage v-if="message.user_id == user.id" :message="message" />
+                    <OtherMessage v-else :message="message" />
+                </template>
 
             </div>
         </div>
@@ -99,11 +187,11 @@ const showUsersDialog = ref(false)
         <!-- Input -->
         <div class="bg-grey-lighter px-4 py-4 flex items-center">
             <div class="flex-1 mx-4">
-                <form>
-                    <input  class="w-full border rounded px-2 py-2" type="text"/>
+                <form @submit.prevent="submitMessage">
+                    <input v-model="form.message" class="w-full border rounded px-2 py-2" type="text"/>
                 </form>
             </div>
-            <button>
+            <button @click="submitMessage()">
                 <PaperAirplane class="stroke-grey-500 size-6" />
             </button>
         </div>
